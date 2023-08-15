@@ -3,7 +3,6 @@ using Mirror;
 using NorthwoodLib.Pools;
 using System.Collections.Generic;
 using System.Reflection.Emit;
-using VoiceChat;
 using VoiceChat.Networking;
 
 namespace Xname.ChaosRadio;
@@ -25,7 +24,6 @@ internal static class VoicechatPatch
         {
             new CodeInstruction(OpCodes.Ldarg_0).MoveLabelsFrom(newInstructions[index]),
             new CodeInstruction(OpCodes.Ldarg_1),
-            new CodeInstruction(OpCodes.Ldloc_1),
             new CodeInstruction(OpCodes.Ldc_I4_1),
             new CodeInstruction(OpCodes.Newobj, AccessTools.GetDeclaredConstructors(typeof(VoicechattingEventArgs))[0]),
             new CodeInstruction(OpCodes.Dup),
@@ -45,19 +43,16 @@ internal static class VoicechatPatch
 
 internal sealed class VoicechattingEventArgs : System.EventArgs
 {
-    public VoicechattingEventArgs(NetworkConnection connection, VoiceMessage message, VoiceChatChannel channel, bool isAllowed = true)
+    public VoicechattingEventArgs(NetworkConnection connection, VoiceMessage message, bool isAllowed = true)
     {
         Connection = connection;
         Message = message;
-        Channel = channel;
         IsAllowed = isAllowed;
     }
 
     public NetworkConnection Connection { get; }
 
     public VoiceMessage Message { get; }
-
-    public VoiceChatChannel Channel { get; }
 
     public bool IsAllowed { get; set; }
 }

@@ -1,6 +1,11 @@
 ﻿using InventorySystem;
+using MEC;
+using PlayerRoles;
 using PlayerRoles.Voice;
-using Respawning;
+using PluginAPI.Core;
+using PluginAPI.Core.Attributes;
+using PluginAPI.Enums;
+using PluginAPI.Events;
 using System.Collections.Generic;
 using System.Linq;
 using VoiceChat;
@@ -17,17 +22,17 @@ internal sealed class RadioHandler
         if (message.Channel is not VoiceChatChannel.Radio)
             return;
 
-        var speakerChaosRadio = HasChaosRadio(message.Speaker);
+        var speakerChaosRadio = Plugin.Config.ChaosRadioNormalRadio || HasChaosRadio(message.Speaker);
         foreach (ReferenceHub hub in ReferenceHub.AllHubs)
         {
             if (hub.roleManager.CurrentRole is not IVoiceRole voiceRole)
                 continue;
 
-            VoiceChatChannel channel = voiceRole.VoiceModule.ValidateReceive(message.Speaker, VoiceChatChannel.Radio);
+            var channel = voiceRole.VoiceModule.ValidateReceive(message.Speaker, VoiceChatChannel.Radio);
             if (channel is VoiceChatChannel.None)
                 continue;
 
-            var recieverChaosRadio = HasChaosRadio(hub);
+            var recieverChaosRadio = Plugin.Config.ChaosRadioNormalRadio || HasChaosRadio(hub);
             if (speakerChaosRadio && recieverChaosRadio)
             {
                 hub.connectionToClient.Send(message);
@@ -35,20 +40,10 @@ internal sealed class RadioHandler
             }
 
             if (!speakerChaosRadio && !recieverChaosRadio)
-            {
                 hub.connectionToClient.Send(message);
-            }
         }
 
         ev.IsAllowed = false;
-    }
-
-    public static void RespawnManager_ServerOnRespawned(SpawnableTeamType team, List<ReferenceHub> players)
-    {
-        if (team is not SpawnableTeamType.ChaosInsurgency)
-            return;
-
-        players.ForEach(x => ChaosRadios.Add(x.inventory.ServerAddItem(ItemType.Radio).ItemSerial));
     }
 
     private static bool HasChaosRadio(ReferenceHub player)
@@ -62,4 +57,54 @@ internal sealed class RadioHandler
 
         return true;
     }
+
+    [PluginEvent(ServerEventType.WaitingForPlayers)]
+    private void OnWaitingForPlayers()
+        => ChaosRadios.Clear();
+
+    [PluginEvent(ServerEventType.PlayerChangeRole)]
+    private void OnPlayerChangeRole(PlayerChangeRoleEvent ev)
+    {
+        if (ev.ChangeReason is not RoleChangeReason.Respawn)
+            return;
+
+        if (ev.NewRole.GetTeam() is not Team.ChaosInsurgency)
+            return;
+
+        Timing.CallDelayed(1f, () =>
+        {
+            ChaosRadios.Add(ev.Player.AddItem(ItemType.Radio).ItemSerial);
+            ev.Player.ReceiveHint(Plugin.Config.RespawnMessage, 10);
+        });
+    }
+
+    [PluginEvent(ServerEventType.PlayerSearchedPickup)]
+    private void OnPlayerSearchedPickup(PlayerSearchedPickupEvent ev)
+    {
+        if (!ChaosRadios.Contains(ev.Item.Info.Serial))
+            return;
+
+        ev.Player.ReceiveHint(Plugin.Config.PickedUpMessage, 5);
+    }
+
+    [PluginEvent(ServerEventType.PlayerChangeItem)]
+    private void OnPlayerChangeItem(PlayerChangeItemEvent ev)
+    {
+        if (!ChaosRadios.Contains(ev.NewItem))
+            return;
+
+        ev.Player.ReceiveHint(Plugin.Config.ItemSelectedMessage, 5);
+    }
+
+#if DEBUG
+    [PluginEvent(ServerEventType.RoundStart)]
+    private void OnRoundStart()
+    {
+        Timing.CallDelayed(2f, () =>
+        {
+            foreach (var player in Player.GetPlayers())
+                ChaosRadios.Add(player.ReferenceHub.inventory.ServerAddItem(ItemType.Radio).ItemSerial);
+        });
+    }
+#endif
 }

@@ -1,11 +1,7 @@
 ﻿using HarmonyLib;
-using InventorySystem;
-using MEC;
-using PluginAPI.Core;
 using PluginAPI.Core.Attributes;
 using PluginAPI.Enums;
 using PluginAPI.Events;
-using Respawning;
 
 namespace Xname.ChaosRadio;
 
@@ -18,38 +14,19 @@ internal sealed class Plugin
     [PluginEntryPoint("Chaos Radio", "1.0.0", "Adds a custom Radio for Chaos Insurgency", "Xname")]
     public void Load()
     {
+        _handler = new();
         _harmony.PatchAll();
-
-        EventManager.RegisterEvents(this);
-        RespawnManager.ServerOnRespawned += RadioHandler.RespawnManager_ServerOnRespawned;
+        EventManager.RegisterEvents(_handler);
     }
 
     [PluginUnload]
     public void Unload()
     {
         _harmony.UnpatchAll();
-
-        EventManager.UnregisterEvents(this);
-        RespawnManager.ServerOnRespawned -= RadioHandler.RespawnManager_ServerOnRespawned;
+        EventManager.UnregisterEvents(_handler);
+        _handler = null;
     }
 
     private static readonly Harmony _harmony = new("xname.chaosradio.pl");
-
-    [PluginEvent(ServerEventType.WaitingForPlayers)]
-    private void OnWaitingForPlayers()
-        => RadioHandler.ChaosRadios.Clear();
-
-#if DEBUG
-    [PluginEvent(ServerEventType.RoundStart)]
-    private void OnRoundStart()
-    {
-        Timing.CallDelayed(2f, () =>
-        {
-            foreach (var player in Player.GetPlayers())
-            {
-                RadioHandler.ChaosRadios.Add(player.ReferenceHub.inventory.ServerAddItem(ItemType.Radio).ItemSerial);
-            }
-        });
-    }
-#endif
+    private static RadioHandler _handler;
 }
